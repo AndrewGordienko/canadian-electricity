@@ -1,0 +1,427 @@
+# there is a weird thing with the coordinates going on
+
+import requests
+from pyproj import Transformer
+from shapely.geometry import Polygon
+
+# Define the URL
+url = "https://services1.arcgis.com/nXhKU3TMjpIZsCx0/arcgis/rest/services/PublicOutageFC_Prod/FeatureServer/6/query"
+
+# Define the parameters
+params = {
+    'f': 'json',
+    'where': '1=1',
+    'returnGeometry': 'true',
+    'spatialRel': 'esriSpatialRelIntersects',
+    'outFields': '*',
+    'maxRecordCountFactor': '4',
+    'outSR': '102100',  # Web Mercator spatial reference system
+    'resultOffset': '0',
+    'resultRecordCount': '4000',
+    'cacheHint': 'true',
+    'quantizationParameters': '{"mode":"view","originPosition":"upperLeft","tolerance":20.50763059859407,"extent":{"xmin":2316470.5419999994,"ymin":7288643,"xmax":2710910.0720000006,"ymax":7674868.260000002,"spatialReference":{"wkid":2036,"latestWkid":2953}}}'
+}
+
+# Make the GET request
+response = requests.get(url, params=params)
+
+# Check if the request was successful
+if response.status_code == 200:
+    print("Request was successful!")
+
+    data = response.json()  # Parse the JSON response
+
+    # Get the spatial reference system
+    spatial_ref = data.get('spatialReference', {}).get('wkid', 102100)  # Default to Web Mercator if not found
+    print(f"Spatial Reference WKID: {spatial_ref}")
+
+    # Initialize the transformer for Web Mercator (102100) to WGS84 (4326)
+    transformer = Transformer.from_crs("EPSG:102100", "EPSG:4326", always_xy=True)
+
+    # Iterate over each feature
+    for feature in data.get('features', []):
+        attributes = feature.get('attributes', {})
+        geometry = feature.get('geometry', {})
+
+        outage_id = attributes.get('GlobalID')
+        customers_affected = attributes.get('CustEff')
+        number_of_outages = attributes.get('NoOfOutages')
+
+        # Check if geometry has 'rings' for polygons
+        if 'rings' in geometry:
+            rings = geometry['rings'][0]  # Use the first ring (outer boundary)
+
+            # Convert the ring into a Polygon object (from shapely)
+            polygon = Polygon(rings)
+
+            # Get the centroid of the polygon
+            centroid = polygon.centroid
+            x, y = centroid.x, centroid.y
+
+            # Transform from Web Mercator to WGS84 if necessary
+            if abs(x) > 1000 and abs(y) > 1000:
+                # Only transform large coordinates (likely in Web Mercator)
+                lon, lat = transformer.transform(x, y)
+            else:
+                # Already in WGS84 (coordinates are already small)
+                lon, lat = x, y
+
+            print(f"Outage ID: {outage_id}")
+            print(f"Customers Affected: {customers_affected}")
+            print(f"Number of Outages: {number_of_outages}")
+            print(f"Location (Latitude, Longitude): {lat}, {lon}")
+            print("-" * 40)
+
+        else:
+            # No geometry data available
+            print(f"Outage ID: {outage_id}")
+            print(f"Customers Affected: {customers_affected}")
+            print(f"Number of Outages: {number_of_outages}")
+            print("Location: N/A, N/A")
+            print("-" * 40)
+
+else:
+    print(f"Request failed with status code {response.status_code}")
+
+"""
+/opt/homebrew/bin/python3.11 /Users/andrewgordienko/Documents/coding/time_lists.py
+andrewgordienko@Andrews-MBP-5 coding % /opt/homebrew/bin/python3.11 /Users/andrewgordienko/Documents/coding/time_lists.py
+Request was successful!
+Spatial Reference WKID: 102100
+Outage ID: 69ec3799-c3ac-4651-91ec-e980a95af3ec
+Customers Affected: 7
+Number of Outages: 1
+Location (Latitude, Longitude): 0.0489170493839264, 0.03707844373291783
+----------------------------------------
+Outage ID: 2f0d5243-c25d-45d0-8e42-f5f4afb0cfb5
+Customers Affected: 25
+Number of Outages: 1
+Location (Latitude, Longitude): -0.5256410256410257, -0.9102564102564104
+----------------------------------------
+Outage ID: e5822ea4-a01e-435b-9366-0668c0dc8922
+Customers Affected: 20
+Number of Outages: 1
+Location (Latitude, Longitude): 0.050762302968474726, 0.03597011235314558
+----------------------------------------
+Outage ID: e71b9846-5627-45ba-9baa-d750803c75ad
+Customers Affected: 78
+Number of Outages: 1
+Location (Latitude, Longitude): 0.04851168243166166, 0.0368985709440322
+----------------------------------------
+Outage ID: 79f4b284-6c15-48d4-85b0-d346497c3900
+Customers Affected: 9
+Number of Outages: 1
+Location (Latitude, Longitude): 0.05208280917152187, 0.03968829986082781
+----------------------------------------
+Outage ID: d353c293-ba1b-4107-8635-5a8bb50c780e
+Customers Affected: 2
+Number of Outages: 1
+Location (Latitude, Longitude): -124.77707686441138, -42.43972326632892
+----------------------------------------
+Outage ID: 8afeeb55-2a41-4de7-a1d7-c420166e268e
+Customers Affected: 21
+Number of Outages: 1
+Location (Latitude, Longitude): 0.05079273096117322, 0.044858741104091805
+----------------------------------------
+Outage ID: a7b263b0-d13b-46a5-8b43-10d73799074e
+Customers Affected: 6
+Number of Outages: 2
+Location (Latitude, Longitude): 1356.5776890859818, 557.7813353042621
+----------------------------------------
+Outage ID: 9a793e34-00b8-4dcb-8064-ec0d19260ca8
+Customers Affected: 1
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06821896848372541, 0.029882952504123338
+----------------------------------------
+Outage ID: 173f3c67-1f63-456e-b395-8516085f8505
+Customers Affected: 60
+Number of Outages: 1
+Location (Latitude, Longitude): 0.07834976991790255, 0.035067754022172035
+----------------------------------------
+Outage ID: 5eb5da0b-00ba-43dc-9ae0-e92bd52d75e9
+Customers Affected: 50
+Number of Outages: 2
+Location (Latitude, Longitude): 390.367245137379, 1188.6642456961106
+----------------------------------------
+Outage ID: c1224d34-3f17-4625-8223-6eadc13a7dba
+Customers Affected: 1
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06902112228336153, 0.034036594258666286
+----------------------------------------
+Outage ID: 9e92ea27-eb3b-4343-ad4e-da6168590f95
+Customers Affected: 12
+Number of Outages: 1
+Location (Latitude, Longitude): 0.028807517907103012, 0.04402322485605573
+----------------------------------------
+Outage ID: f906a09f-8776-4ffe-886f-a1260c222312
+Customers Affected: 5
+Number of Outages: 1
+Location (Latitude, Longitude): 0.05395265830374013, 0.026077458230817505
+----------------------------------------
+Outage ID: 53992b55-02a0-4866-8a8a-fb7b7046d047
+Customers Affected: 69
+Number of Outages: 1
+Location (Latitude, Longitude): 0.02484206834150371, 0.01509139281106129
+----------------------------------------
+Outage ID: fa7f4851-553a-421a-9e30-b5db2e2a457b
+Customers Affected: 1
+Number of Outages: 1
+Location (Latitude, Longitude): 9.26600110926234, 8.13832501386578
+----------------------------------------
+Outage ID: 5c97b20c-097a-47b3-a602-9168c7c25773
+Customers Affected: 84
+Number of Outages: 1
+Location (Latitude, Longitude): 0.048131517169311945, 0.046766035229342404
+----------------------------------------
+Outage ID: ca849d73-21eb-4472-bf91-91a6d61f332a
+Customers Affected: 3
+Number of Outages: 1
+Location (Latitude, Longitude): 0.052240538057637266, 0.02624803180361382
+----------------------------------------
+Outage ID: ec9b8464-48d3-4d77-83c3-0b7253d6ab6f
+Customers Affected: 127
+Number of Outages: 1
+Location (Latitude, Longitude): 0.05120338083266469, 0.047044425688356505
+----------------------------------------
+Outage ID: a408cbae-ba2a-4c7f-a00d-0dcf30f6d294
+Customers Affected: 12
+Number of Outages: 1
+Location (Latitude, Longitude): 0.05075939185932198, 0.024571814514846958
+----------------------------------------
+Outage ID: af39afa5-45bc-4d02-871b-12e453b57336
+Customers Affected: 1
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06842366198136639, 0.02838266198596881
+----------------------------------------
+Outage ID: 877acece-8de7-4821-afc4-a4817437ed84
+Customers Affected: 31
+Number of Outages: 1
+Location (Latitude, Longitude): 0.0492886297899607, 0.020086099411264928
+----------------------------------------
+Outage ID: bc41ca65-4724-441b-824a-14531b325091
+Customers Affected: 16
+Number of Outages: 1
+Location (Latitude, Longitude): 0.04979052393666925, 0.04830697107393513
+----------------------------------------
+Outage ID: 0de26c4a-6d6e-407e-a945-1cc95853acfb
+Customers Affected: 10
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06140656915919054, 0.055572662814357916
+----------------------------------------
+Outage ID: 7ca9d655-88b0-4e9e-b0da-ba122b49e345
+Customers Affected: 5
+Number of Outages: 1
+Location (Latitude, Longitude): 0.041479460819806385, 0.029572774730395976
+----------------------------------------
+Outage ID: ec3b8dcb-e8d1-430a-863f-e504ee9e1434
+Customers Affected: 64
+Number of Outages: 1
+Location (Latitude, Longitude): -0.02204148657986776, -0.010563132452753253
+----------------------------------------
+Outage ID: bd406bfb-5c48-4e4f-ab92-a1ac94ad0df2
+Customers Affected: 34
+Number of Outages: 1
+Location (Latitude, Longitude): 0.0508479601979841, 0.03366957119937742
+----------------------------------------
+Outage ID: eb9a0f62-66cc-4070-a6ea-3da9d5ae689d
+Customers Affected: 101
+Number of Outages: 1
+Location (Latitude, Longitude): 0.04937883590716442, 0.03463518160347917
+----------------------------------------
+Outage ID: 831c9a3b-c78b-4397-900e-b4ac3ca1a6a8
+Customers Affected: 47
+Number of Outages: 1
+Location (Latitude, Longitude): 0.0529099771711389, 0.02170388814982079
+----------------------------------------
+Outage ID: d13bbcce-6e0b-427b-ad4b-7fbbe608d0c1
+Customers Affected: 294
+Number of Outages: 1
+Location (Latitude, Longitude): 0.046728999870465596, 0.040404272997233814
+----------------------------------------
+Outage ID: 9e727670-6937-4a49-9c0e-9167ded08a0d
+Customers Affected: 503
+Number of Outages: 1
+Location (Latitude, Longitude): 0.05227478476402186, 0.03963732841279021
+----------------------------------------
+Outage ID: 8087e47e-97f6-420d-a3d5-776314746b7a
+Customers Affected: 9
+Number of Outages: 1
+Location (Latitude, Longitude): 0.05936078151985797, 0.03817235882576485
+----------------------------------------
+Outage ID: 5f36284e-1a28-405b-8945-8db8bcdc5385
+Customers Affected: 147
+Number of Outages: 1
+Location (Latitude, Longitude): 0.05075423079924594, 0.03313130367838975
+----------------------------------------
+Outage ID: 1b011c0d-ec4f-4a3f-a886-3724b703a46d
+Customers Affected: 132
+Number of Outages: 1
+Location (Latitude, Longitude): 0.05133798305307645, 0.045813558671462175
+----------------------------------------
+Outage ID: 309c3b56-75ee-478f-984c-f02303b1a2bf
+Customers Affected: 14
+Number of Outages: 1
+Location (Latitude, Longitude): 0.04995592785840856, 0.01866744815688006
+----------------------------------------
+Outage ID: ba31f423-af12-46b6-be9f-c4d98d16c1bc
+Customers Affected: 15
+Number of Outages: 1
+Location (Latitude, Longitude): 0.09832810393305394, 0.04551439820328611
+----------------------------------------
+Outage ID: e602dd6a-f8ae-4c2f-b159-5eec2d109e16
+Customers Affected: 13
+Number of Outages: 1
+Location (Latitude, Longitude): 1173.8502677947683, 506.8667753370074
+----------------------------------------
+Outage ID: b89a3f2a-2079-4bcf-be3f-6924b6b01f59
+Customers Affected: 3
+Number of Outages: 1
+Location (Latitude, Longitude): 0.05847244960108658, 0.0539142745001174
+----------------------------------------
+Outage ID: dceec44d-c50a-46f3-b5c3-13aa635b749c
+Customers Affected: 58
+Number of Outages: 1
+Location (Latitude, Longitude): 0.9034986262883667, 0.9117409690510859
+----------------------------------------
+Outage ID: 9c9124d6-d007-4d5b-a8ec-475e58f14a32
+Customers Affected: 1
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06039833573903752, 0.058955256847521335
+----------------------------------------
+Outage ID: 46240c29-6695-432e-9e3b-809d2193581f
+Customers Affected: 34
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06643039385724885, 0.027457533226840563
+----------------------------------------
+Outage ID: 2d88757f-7597-4e91-a37f-a88ac3e24d31
+Customers Affected: 13
+Number of Outages: 1
+Location (Latitude, Longitude): 0.05087601046378623, 0.027522013146315822
+----------------------------------------
+Outage ID: f43339cc-c03d-4049-a995-a3f08b195b1b
+Customers Affected: 18
+Number of Outages: 1
+Location (Latitude, Longitude): 0.04163796363810729, 0.025085152537146067
+----------------------------------------
+Outage ID: 7ead79c8-34d0-4142-a7d9-ae34a9df1296
+Customers Affected: 25
+Number of Outages: 1
+Location (Latitude, Longitude): 0.20111188007629702, 0.07653674841226388
+----------------------------------------
+Outage ID: 8fa9a1d6-6d1d-4312-8f60-97710919d230
+Customers Affected: 22
+Number of Outages: 1
+Location (Latitude, Longitude): 0.0482593821539817, 0.04548941187520993
+----------------------------------------
+Outage ID: 8bbac3db-db14-4b48-b5e9-b303cdae9d17
+Customers Affected: 145
+Number of Outages: 1
+Location (Latitude, Longitude): 0.03202429253831033, 0.029799136898955633
+----------------------------------------
+Outage ID: 3157f505-b93a-430b-b1fd-c93c1d27c3fc
+Customers Affected: 1
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06462066891493416, 0.04697763591937961
+----------------------------------------
+Outage ID: 39256f97-4e7a-4d42-bec3-195f0d19a14d
+Customers Affected: 6
+Number of Outages: 1
+Location (Latitude, Longitude): 0.01689436703725665, 0.010016964660982567
+----------------------------------------
+Outage ID: c7222e5e-47b8-4c47-86bc-18a4487ae93f
+Customers Affected: 139
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06873401086223292, 0.04492535128628988
+----------------------------------------
+Outage ID: 1e610d59-902e-48ae-b3f9-b5bbd1987dfd
+Customers Affected: 119
+Number of Outages: 1
+Location (Latitude, Longitude): 0.04834666603626553, 0.03252392074893183
+----------------------------------------
+Outage ID: 5a249b84-c0cc-4cb2-8428-cd11a70d2457
+Customers Affected: 27
+Number of Outages: 1
+Location (Latitude, Longitude): 0.07005731389016974, 0.06025563537109048
+----------------------------------------
+Outage ID: 3a093e0e-8126-46de-bc11-0ed5b85421df
+Customers Affected: 14
+Number of Outages: 1
+Location (Latitude, Longitude): 0.07046681077274813, 0.030577758618678074
+----------------------------------------
+Outage ID: 9e58d4fb-a4df-408a-bd14-a3c93b8c3c47
+Customers Affected: 33
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06711990413061764, 0.02824413313343033
+----------------------------------------
+Outage ID: 54edf0c4-2c98-4529-aec4-a6aec9fb8f96
+Customers Affected: 1
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06996789309943573, 0.034952558394791826
+----------------------------------------
+Outage ID: d32a2b9a-7e12-41c3-8f5a-dcde19ee0f87
+Customers Affected: 10
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06425397681762494, 0.05566518991461636
+----------------------------------------
+Outage ID: c0ece2b5-7d4a-439f-a09f-141f5c8bbbfa
+Customers Affected: 32
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06528030747275819, 0.055566645107515696
+----------------------------------------
+Outage ID: 77b20c6f-5dc7-4397-ab30-73ff754c13f6
+Customers Affected: 66
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06841290627966973, 0.027685223696511024
+----------------------------------------
+Outage ID: 407558bd-8bd9-4b99-a285-c2da0a0683be
+Customers Affected: 9
+Number of Outages: 1
+Location (Latitude, Longitude): 0.05914443402538099, 0.026102039238024337
+----------------------------------------
+Outage ID: 8b608303-a7e2-4e8e-88d6-7494d2384e7f
+Customers Affected: 11
+Number of Outages: 1
+Location (Latitude, Longitude): 0.03380265061712673, 0.02224154117608208
+----------------------------------------
+Outage ID: fd8582f4-a20e-4bfc-8a65-387485dcfeba
+Customers Affected: 7
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06426625005720175, 0.0562446882597302
+----------------------------------------
+Outage ID: 14b05b74-ade8-4d23-85f3-2dbb3ba8361d
+Customers Affected: 3
+Number of Outages: 1
+Location (Latitude, Longitude): 0.07224522629949733, 0.027891011869618013
+----------------------------------------
+Outage ID: e83e852f-5767-48da-84c7-1b5a1a247ae3
+Customers Affected: 3
+Number of Outages: 1
+Location (Latitude, Longitude): 0.04739320536502251, 0.02398801732423932
+----------------------------------------
+Outage ID: 032b4600-1052-46dd-85e8-dfcc1a84a918
+Customers Affected: 24
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06912013472282318, 0.03051699653818365
+----------------------------------------
+Outage ID: 8c803c2d-79d6-4ab0-8be5-7255f3eead44
+Customers Affected: 2
+Number of Outages: 1
+Location (Latitude, Longitude): 0.06630585269523155, 0.05182959441877349
+----------------------------------------
+Outage ID: 8dfd25d3-46a1-437b-bbf9-79bebc299f68
+Customers Affected: 2
+Number of Outages: 1
+Location (Latitude, Longitude): -25.214299188832296, -26.844934917940012
+----------------------------------------
+Outage ID: 6f340e88-3758-4408-9c79-dea87265428a
+Customers Affected: 1
+Number of Outages: 1
+Location (Latitude, Longitude): 0.04400824572074037, 0.03650238994758383
+----------------------------------------
+Outage ID: 0d2ef3e6-389f-4ec9-895f-d1742e3edf09
+Customers Affected: 87
+Number of Outages: 2
+Location (Latitude, Longitude): 0.0485269743223245, 0.04737798946132447
+----------------------------------------
+andrewgordienko@Andrews-MBP-5 coding % 
+"""
