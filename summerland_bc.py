@@ -1,17 +1,45 @@
-# still need to figure out how the areas are predefined
 import requests
+import json
 
-# The URL for the FeatureServer API endpoint
-url = "https://services6.arcgis.com/JN8M9MlOj1fhcuDs/arcgis/rest/services/PowerStatusbyPredefinedArea_view/FeatureServer/0?f=json"
+# The API endpoint
+url = "https://services6.arcgis.com/JN8M9MlOj1fhcuDs/arcgis/rest/services/PowerStatusbyPredefinedArea_view/FeatureServer/0/query"
 
-# Make the GET request to the API
-response = requests.get(url)
+# Parameters for the API call (set format to 'json')
+params = {
+    'f': 'json',  # Change to JSON
+    'where': '1=1',
+    'returnGeometry': 'true',
+    'spatialRel': 'esriSpatialRelIntersects',
+    'outFields': '*',
+    'maxRecordCountFactor': '2',
+    'outSR': '102100',
+    'resultOffset': '0',
+    'resultRecordCount': '4000',
+    'cacheHint': 'true',
+    'quantizationParameters': '{"mode":"view","originPosition":"upperLeft","tolerance":1.0583354500042543,"extent":{"xmin":298871.90869999956,"ymin":5492077.0319,"xmax":310639.4157999996,"ymax":5507926.5013,"spatialReference":{"wkid":26911,"latestWkid":26911}}}'
+}
 
-# Check if the request was successful
+# Making the GET request to the ArcGIS API
+response = requests.get(url, params=params)
+
+# Checking if the request was successful
 if response.status_code == 200:
-    # Print the response content (JSON)
+    print("Data retrieved successfully!")
+    
+    # Parse the response as JSON
     data = response.json()
-    print("Data retrieved successfully:")
-    print(data)
+
+    # Save to a file
+    with open("output.json", "w") as file:
+        json.dump(data, file, indent=4)
+    
+    # Example of how to extract and print relevant fields
+    for feature in data['features']:
+        attributes = feature['attributes']
+        location = attributes['Location']
+        status = attributes['Status']
+        customers = attributes.get('Customers', 'N/A')
+
+        print(f"Location: {location}, Status: {status}, Customers Affected: {customers}")
 else:
-    print(f"Failed to fetch data. Status code: {response.status_code}")
+    print(f"Failed to retrieve data. HTTP Status code: {response.status_code}")
